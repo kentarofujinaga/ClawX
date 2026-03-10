@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -613,11 +614,19 @@ function AddProviderDialog({
 
   // OAuth Flow State
   const [oauthFlowing, setOauthFlowing] = useState(false);
-  const [oauthData, setOauthData] = useState<{
+  const [oauthDeviceData, setOauthDeviceData] = useState<{
     verificationUri: string;
     userCode: string;
     expiresIn: number;
   } | null>(null);
+  const [oauthBrowserData, setOauthBrowserData] = useState<{
+    authorizationUrl: string;
+    instructions?: string;
+    canPasteRedirect: boolean;
+  } | null>(null);
+  const [oauthManualInput, setOauthManualInput] = useState('');
+  const [oauthProgressMessage, setOauthProgressMessage] = useState<string | null>(null);
+  const [submittingOAuthInput, setSubmittingOAuthInput] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
   // For providers that support both OAuth and API key, let the user choose
   const [authMode, setAuthMode] = useState<'oauth' | 'apikey'>('oauth');
@@ -638,13 +647,36 @@ function AddProviderDialog({
   // Manage OAuth events
   useEffect(() => {
     const handleCode = (data: unknown) => {
-      setOauthData(data as { verificationUri: string; userCode: string; expiresIn: number });
+      setOauthDeviceData(data as { verificationUri: string; userCode: string; expiresIn: number });
+      setOauthBrowserData(null);
+      setOauthProgressMessage(null);
       setOauthError(null);
+    };
+
+    const handleAuth = (data: unknown) => {
+      setOauthBrowserData(data as {
+        authorizationUrl: string;
+        instructions?: string;
+        canPasteRedirect: boolean;
+      });
+      setOauthDeviceData(null);
+      setOauthProgressMessage(null);
+      setOauthError(null);
+    };
+
+    const handleProgress = (data: unknown) => {
+      const message = (data as { message?: string })?.message;
+      if (message) {
+        setOauthProgressMessage(message);
+      }
     };
 
     const handleSuccess = async () => {
       setOauthFlowing(false);
-      setOauthData(null);
+      setOauthDeviceData(null);
+      setOauthBrowserData(null);
+      setOauthManualInput('');
+      setOauthProgressMessage(null);
       setValidationError(null);
 
       const { onClose: close, t: translate } = latestRef.current;
@@ -672,16 +704,22 @@ function AddProviderDialog({
 
     const handleError = (data: unknown) => {
       setOauthError((data as { message: string }).message);
-      setOauthData(null);
+      setOauthDeviceData(null);
+      setOauthBrowserData(null);
+      setOauthProgressMessage(null);
     };
 
     window.electron.ipcRenderer.on('oauth:code', handleCode);
+    window.electron.ipcRenderer.on('oauth:auth', handleAuth);
+    window.electron.ipcRenderer.on('oauth:progress', handleProgress);
     window.electron.ipcRenderer.on('oauth:success', handleSuccess);
     window.electron.ipcRenderer.on('oauth:error', handleError);
 
     return () => {
       if (typeof window.electron.ipcRenderer.off === 'function') {
         window.electron.ipcRenderer.off('oauth:code', handleCode);
+        window.electron.ipcRenderer.off('oauth:auth', handleAuth);
+        window.electron.ipcRenderer.off('oauth:progress', handleProgress);
         window.electron.ipcRenderer.off('oauth:success', handleSuccess);
         window.electron.ipcRenderer.off('oauth:error', handleError);
       }
@@ -701,11 +739,17 @@ function AddProviderDialog({
     }
 
     setOauthFlowing(true);
-    setOauthData(null);
+    setOauthDeviceData(null);
+    setOauthBrowserData(null);
+    setOauthManualInput('');
+    setOauthProgressMessage(null);
     setOauthError(null);
 
     try {
-      await invokeIpc('provider:requestOAuth', selectedType);
+      const result = await invokeIpc<{ success: boolean; error?: string }>('provider:requestOAuth', selectedType);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to start OAuth');
+      }
     } catch (e) {
       setOauthError(String(e));
       setOauthFlowing(false);
@@ -714,9 +758,36 @@ function AddProviderDialog({
 
   const handleCancelOAuth = async () => {
     setOauthFlowing(false);
-    setOauthData(null);
+    setOauthDeviceData(null);
+    setOauthBrowserData(null);
+    setOauthManualInput('');
+    setOauthProgressMessage(null);
     setOauthError(null);
     await invokeIpc('provider:cancelOAuth');
+  };
+
+  const handleSubmitOAuthInput = async () => {
+    if (!selectedType || !oauthManualInput.trim()) return;
+
+    setSubmittingOAuthInput(true);
+    setOauthError(null);
+
+    try {
+      const result = await invokeIpc<{ success: boolean; error?: string }>(
+        'provider:submitOAuthInput',
+        selectedType,
+        oauthManualInput.trim()
+      );
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to submit OAuth redirect');
+      }
+      setOauthProgressMessage(t('aiProviders.oauth.redirectSubmitted'));
+      setOauthManualInput('');
+    } catch (error) {
+      setOauthError(String(error));
+    } finally {
+      setSubmittingOAuthInput(false);
+    }
   };
 
   // Only custom can be added multiple times.
@@ -801,6 +872,11 @@ function AddProviderDialog({
                     setName(type.id === 'custom' ? t('aiProviders.custom') : type.name);
                     setBaseUrl(type.defaultBaseUrl || '');
                     setModelId(type.defaultModelId || '');
+                    setOauthDeviceData(null);
+                    setOauthBrowserData(null);
+                    setOauthManualInput('');
+                    setOauthProgressMessage(null);
+                    setOauthError(null);
                   }}
                   className="p-4 rounded-lg border hover:bg-accent transition-colors text-center"
                 >
@@ -829,6 +905,11 @@ function AddProviderDialog({
                       setValidationError(null);
                       setBaseUrl('');
                       setModelId('');
+                      setOauthDeviceData(null);
+                      setOauthBrowserData(null);
+                      setOauthManualInput('');
+                      setOauthProgressMessage(null);
+                      setOauthError(null);
                     }}
                     className="text-sm text-muted-foreground hover:text-foreground"
                   >
@@ -976,10 +1057,65 @@ function AddProviderDialog({
                             <p className="font-medium">{t('aiProviders.oauth.authFailed')}</p>
                             <p className="text-sm opacity-80">{oauthError}</p>
                             <Button variant="outline" size="sm" onClick={handleCancelOAuth} className="mt-2 text-foreground">
-                              Try Again
+                              {t('aiProviders.oauth.tryAgain')}
                             </Button>
                           </div>
-                        ) : !oauthData ? (
+                        ) : oauthBrowserData ? (
+                          <div className="space-y-4 w-full text-left">
+                            <div className="space-y-2">
+                              <h3 className="font-medium text-lg text-foreground text-center">{t('aiProviders.oauth.approveLogin')}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {oauthBrowserData.instructions || t('aiProviders.oauth.loginPrompt')}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {t('aiProviders.oauth.callbackHelp')}
+                              </p>
+                            </div>
+
+                            <Button
+                              variant="secondary"
+                              className="w-full"
+                              onClick={() => invokeIpc('shell:openExternal', oauthBrowserData.authorizationUrl)}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              {t('aiProviders.oauth.openLoginPage')}
+                            </Button>
+
+                            {oauthBrowserData.canPasteRedirect && (
+                              <div className="space-y-2">
+                                <Label htmlFor="oauth-redirect-url">{t('aiProviders.oauth.redirectUrlLabel')}</Label>
+                                <Textarea
+                                  id="oauth-redirect-url"
+                                  value={oauthManualInput}
+                                  onChange={(e) => setOauthManualInput(e.target.value)}
+                                  placeholder={t('aiProviders.oauth.redirectUrlPlaceholder')}
+                                  className="min-h-24"
+                                />
+                                <Button
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={handleSubmitOAuthInput}
+                                  disabled={!oauthManualInput.trim() || submittingOAuthInput}
+                                >
+                                  {submittingOAuthInput ? (
+                                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('aiProviders.oauth.waiting')}</>
+                                  ) : (
+                                    t('aiProviders.oauth.submitRedirect')
+                                  )}
+                                </Button>
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-2">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span>{oauthProgressMessage || t('aiProviders.oauth.waitingApproval')}</span>
+                            </div>
+
+                            <Button variant="ghost" size="sm" className="w-full mt-2" onClick={handleCancelOAuth}>
+                              {t('aiProviders.oauth.cancel')}
+                            </Button>
+                          </div>
+                        ) : !oauthDeviceData ? (
                           <div className="space-y-3 py-4">
                             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
                             <p className="text-sm text-muted-foreground animate-pulse">{t('aiProviders.oauth.requestingCode')}</p>
@@ -997,13 +1133,13 @@ function AddProviderDialog({
 
                             <div className="flex items-center justify-center gap-2 p-3 bg-background border rounded-lg">
                               <code className="text-2xl font-mono tracking-widest font-bold text-primary">
-                                {oauthData.userCode}
+                                {oauthDeviceData.userCode}
                               </code>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => {
-                                  navigator.clipboard.writeText(oauthData.userCode);
+                                  navigator.clipboard.writeText(oauthDeviceData.userCode);
                                   toast.success(t('aiProviders.oauth.codeCopied'));
                                 }}
                               >
@@ -1014,7 +1150,7 @@ function AddProviderDialog({
                             <Button
                               variant="secondary"
                               className="w-full"
-                              onClick={() => invokeIpc('shell:openExternal', oauthData.verificationUri)}
+                              onClick={() => invokeIpc('shell:openExternal', oauthDeviceData.verificationUri)}
                             >
                               <ExternalLink className="h-4 w-4 mr-2" />
                               {t('aiProviders.oauth.openLoginPage')}
@@ -1026,7 +1162,7 @@ function AddProviderDialog({
                             </div>
 
                             <Button variant="ghost" size="sm" className="w-full mt-2" onClick={handleCancelOAuth}>
-                              Cancel
+                              {t('aiProviders.oauth.cancel')}
                             </Button>
                           </div>
                         )}

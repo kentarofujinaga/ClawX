@@ -50,7 +50,12 @@ import { updateSkillConfig, getSkillConfig, getAllSkillConfigs } from '../utils/
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
 import { getProviderConfig } from '../utils/provider-registry';
 import { getProviderDefaultModel } from '../utils/provider-registry';
-import { deviceOAuthManager, OAuthProviderType } from '../utils/device-oauth';
+import { deviceOAuthManager, OAuthProviderType as DeviceOAuthProviderType } from '../utils/device-oauth';
+import {
+  openAICodexOAuthManager,
+  OPENAI_CODEX_PROVIDER_TYPE,
+  type OpenAICodexProviderType,
+} from '../utils/openai-codex-oauth';
 import { applyProxySettings } from './proxy';
 import { proxyAwareFetch } from '../utils/proxy-fetch';
 import { getRecentTokenUsageHistory } from '../utils/token-usage';
@@ -1777,12 +1782,19 @@ function registerWhatsAppHandlers(mainWindow: BrowserWindow): void {
  */
 function registerDeviceOAuthHandlers(mainWindow: BrowserWindow): void {
   deviceOAuthManager.setWindow(mainWindow);
+  openAICodexOAuthManager.setWindow(mainWindow);
+
+  type ProviderOAuthType = DeviceOAuthProviderType | OpenAICodexProviderType;
 
   // Request Provider OAuth initialization
-  ipcMain.handle('provider:requestOAuth', async (_, provider: OAuthProviderType, region?: 'global' | 'cn') => {
+  ipcMain.handle('provider:requestOAuth', async (_, provider: ProviderOAuthType, region?: 'global' | 'cn') => {
     try {
       logger.info(`provider:requestOAuth for ${provider}`);
-      await deviceOAuthManager.startFlow(provider, region);
+      if (provider === OPENAI_CODEX_PROVIDER_TYPE) {
+        await openAICodexOAuthManager.startFlow();
+      } else {
+        await deviceOAuthManager.startFlow(provider, region);
+      }
       return { success: true };
     } catch (error) {
       logger.error('provider:requestOAuth failed', error);
@@ -1790,9 +1802,24 @@ function registerDeviceOAuthHandlers(mainWindow: BrowserWindow): void {
     }
   });
 
+  ipcMain.handle('provider:submitOAuthInput', async (_, provider: ProviderOAuthType, input: string) => {
+    try {
+      if (provider !== OPENAI_CODEX_PROVIDER_TYPE) {
+        return { success: false, error: `Manual OAuth input is not supported for provider "${provider}"` };
+      }
+
+      await openAICodexOAuthManager.submitManualInput(input);
+      return { success: true };
+    } catch (error) {
+      logger.error('provider:submitOAuthInput failed', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
   // Cancel Provider OAuth
   ipcMain.handle('provider:cancelOAuth', async () => {
     try {
+      await openAICodexOAuthManager.stopFlow();
       await deviceOAuthManager.stopFlow();
       return { success: true };
     } catch (error) {
@@ -1814,6 +1841,21 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
   deviceOAuthManager.on('oauth:success', (providerType) => {
     logger.info(`[IPC] Scheduling Gateway restart after ${providerType} OAuth success...`);
     gatewayManager.debouncedRestart(8000);
+  });
+
+  openAICodexOAuthManager.on('oauth:success', () => {
+    void (async () => {
+      try {
+        const defaultProviderId = await getDefaultProvider();
+        if (defaultProviderId !== OPENAI_CODEX_PROVIDER_TYPE) return;
+        if (gatewayManager.getStatus().state === 'stopped') return;
+
+        logger.info('[IPC] Scheduling Gateway restart after OpenAI Codex OAuth success...');
+        gatewayManager.debouncedRestart();
+      } catch (error) {
+        logger.warn('[IPC] Failed to schedule restart after OpenAI Codex OAuth success:', error);
+      }
+    })();
   });
 
   // Get all providers with key info

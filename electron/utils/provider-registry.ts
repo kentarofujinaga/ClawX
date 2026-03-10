@@ -8,6 +8,7 @@
 export const BUILTIN_PROVIDER_TYPES = [
   'anthropic',
   'openai',
+  'openai-codex',
   'google',
   'openrouter',
   'ark',
@@ -54,6 +55,9 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
       api: 'openai-responses',
       apiKeyEnv: 'OPENAI_API_KEY',
     },
+  },
+  'openai-codex': {
+    defaultModel: 'openai-codex/gpt-5.3-codex',
   },
   google: {
     envVar: 'GEMINI_API_KEY',

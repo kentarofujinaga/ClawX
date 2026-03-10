@@ -8,6 +8,7 @@
 export const PROVIDER_TYPES = [
   'anthropic',
   'openai',
+  'openai-codex',
   'google',
   'openrouter',
   'ark',
@@ -75,6 +76,7 @@ import { providerIcons } from '@/assets/providers';
 export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
   { id: 'anthropic', name: 'Anthropic', icon: '🤖', placeholder: 'sk-ant-api03-...', model: 'Claude', requiresApiKey: true },
   { id: 'openai', name: 'OpenAI', icon: '💚', placeholder: 'sk-proj-...', model: 'GPT', requiresApiKey: true },
+  { id: 'openai-codex', name: 'OpenAI Codex', icon: '💚', placeholder: 'Sign in with ChatGPT', model: 'Codex', requiresApiKey: false, isOAuth: true },
   { id: 'google', name: 'Google', icon: '🔷', placeholder: 'AIza...', model: 'Gemini', requiresApiKey: true },
   { id: 'openrouter', name: 'OpenRouter', icon: '🌐', placeholder: 'sk-or-v1-...', model: 'Multi-Model', requiresApiKey: true, showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'anthropic/claude-opus-4.6', defaultModelId: 'anthropic/claude-opus-4.6' },
   { id: 'ark', name: 'ByteDance Ark', icon: 'A', placeholder: 'your-ark-api-key', model: 'Doubao', requiresApiKey: true, defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'ep-20260228000000-xxxxx' },

@@ -76,6 +76,7 @@ interface OAuthProfileEntry {
   access: string;
   refresh: string;
   expires: number;
+  [key: string]: unknown;
 }
 
 interface AuthProfilesStore {
@@ -155,7 +156,7 @@ async function writeOpenClawJson(config: Record<string, unknown>): Promise<void>
  */
 export async function saveOAuthTokenToOpenClaw(
   provider: string,
-  token: { access: string; refresh: string; expires: number },
+  token: { access: string; refresh: string; expires: number; [key: string]: unknown },
   agentId?: string
 ): Promise<void> {
   const agentIds = agentId ? [agentId] : await discoverAgentIds();
@@ -164,13 +165,15 @@ export async function saveOAuthTokenToOpenClaw(
   for (const id of agentIds) {
     const store = await readAuthProfiles(id);
     const profileId = `${provider}:default`;
+    const { access, refresh, expires, ...extraFields } = token;
 
     store.profiles[profileId] = {
       type: 'oauth',
       provider,
-      access: token.access,
-      refresh: token.refresh,
-      expires: token.expires,
+      access,
+      refresh,
+      expires,
+      ...extraFields,
     };
 
     if (!store.order) store.order = {};
