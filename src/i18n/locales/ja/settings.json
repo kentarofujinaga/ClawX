@@ -138,6 +138,7 @@
       "available": "更新あり: v{{version}}",
       "downloaded": "インストール準備完了: v{{version}}",
       "autoInstalling": "{{seconds}} 秒後に再起動して更新をインストールします...",
+      "manualReviewOnly": "この fork ではアプリ内更新を無効化しています。upstream の変更を手動でレビューしてください。",
       "failed": "更新の確認に失敗しました",
       "latest": "最新バージョンです",
       "check": "更新を確認して最新の機能を入手"
@@ -147,14 +148,21 @@
       "downloading": "ダウンロード中...",
       "download": "更新をダウンロード",
       "install": "インストールして再起動",
+      "manualReviewOnly": "手動レビュー専用",
       "cancelAutoInstall": "キャンセル",
       "retry": "再試行",
       "check": "更新を確認"
     },
+    "policy": {
+      "title": "手動レビュー専用",
+      "desc": "この fork は upstream のリリースを自動では信頼しません。差分、依存関係、updater の挙動、配布物を確認してから取り込んでください。",
+      "guide": "レビュー手順: docs/update-review-policy.md"
+    },
     "currentVersion": "現在のバージョン",
     "whatsNew": "更新内容：",
     "errorDetails": "エラー詳細：",
-    "help": "自動アップデートが有効な場合、更新は自動的にダウンロードされインストールされます。"
+    "help": "自動アップデートが有効な場合、更新は自動的にダウンロードされインストールされます。",
+    "helpManualReview": "アプリ内自動更新は無効です。upstream を取得し、セキュリティ影響を確認し、テスト後に手動で取り込んでください。"
   },
   "advanced": {
     "title": "詳細設定",

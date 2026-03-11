@@ -82,6 +82,7 @@ const electronAPI = {
         'provider:getDefault',
         'provider:validateKey',
         'provider:requestOAuth',
+        'provider:submitOAuthInput',
         'provider:cancelOAuth',
         // Cron
         'cron:list',
@@ -171,6 +172,8 @@ const electronAPI = {
         'update:auto-install-countdown',
         'cron:updated',
         'oauth:code',
+        'oauth:auth',
+        'oauth:progress',
         'oauth:success',
         'oauth:error',
         'openclaw:cli-installed',
@@ -214,6 +217,8 @@ const electronAPI = {
         'update:error',
         'update:auto-install-countdown',
         'oauth:code',
+        'oauth:auth',
+        'oauth:progress',
         'oauth:success',
         'oauth:error',
       ];

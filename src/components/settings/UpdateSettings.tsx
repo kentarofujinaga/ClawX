@@ -56,6 +56,8 @@ export function UpdateSettings() {
         return <Rocket className="h-4 w-4 text-primary" />;
       case 'error':
         return <RefreshCw className="h-4 w-4 text-destructive" />;
+      case 'disabled':
+        return <XCircle className="h-4 w-4 text-amber-600" />;
       default:
         return <RefreshCw className="h-4 w-4 text-muted-foreground" />;
     }
@@ -76,6 +78,8 @@ export function UpdateSettings() {
         return t('updates.status.downloaded', { version: updateInfo?.version });
       case 'error':
         return error || t('updates.status.failed');
+      case 'disabled':
+        return t('updates.status.manualReviewOnly');
       case 'not-available':
         return t('updates.status.latest');
       default:
@@ -128,6 +132,13 @@ export function UpdateSettings() {
             {t('updates.action.retry')}
           </Button>
         );
+      case 'disabled':
+        return (
+          <Button disabled variant="outline" size="sm">
+            <XCircle className="h-4 w-4 mr-2" />
+            {t('updates.action.manualReviewOnly')}
+          </Button>
+        );
       default:
         return (
           <Button onClick={handleCheckForUpdates} variant="outline" size="sm">
@@ -163,6 +174,14 @@ export function UpdateSettings() {
         <p className="text-sm text-muted-foreground">{renderStatusText()}</p>
         {renderAction()}
       </div>
+
+      {status === 'disabled' && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+          <p className="font-medium text-foreground">{t('updates.policy.title')}</p>
+          <p className="mt-1 text-muted-foreground">{t('updates.policy.desc')}</p>
+          <p className="mt-2 font-mono text-xs text-muted-foreground">{t('updates.policy.guide')}</p>
+        </div>
+      )}
 
       {/* Download Progress */}
       {status === 'downloading' && progress && (
@@ -210,7 +229,7 @@ export function UpdateSettings() {
 
       {/* Help Text */}
       <p className="text-xs text-muted-foreground">
-        {t('updates.help')}
+        {status === 'disabled' ? t('updates.helpManualReview') : t('updates.help')}
       </p>
     </div>
   );

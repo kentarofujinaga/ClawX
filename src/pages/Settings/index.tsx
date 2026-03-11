@@ -65,17 +65,12 @@ export function Settings() {
     setProxyAllServer,
     setProxyBypassRules,
     setGatewayTransportPreference,
-    autoCheckUpdate,
-    setAutoCheckUpdate,
-    autoDownloadUpdate,
-    setAutoDownloadUpdate,
     devModeUnlocked,
     setDevModeUnlocked,
   } = useSettingsStore();
 
   const { status: gatewayStatus, restart: restartGateway } = useGatewayStore();
   const currentVersion = useUpdateStore((state) => state.currentVersion);
-  const updateSetAutoDownload = useUpdateStore((state) => state.setAutoDownload);
   const [controlUiInfo, setControlUiInfo] = useState<ControlUiInfo | null>(null);
   const [openclawCliCommand, setOpenclawCliCommand] = useState('');
   const [openclawCliError, setOpenclawCliError] = useState<string | null>(null);
@@ -560,33 +555,19 @@ export function Settings() {
 
           <Separator />
 
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>{t('updates.autoCheck')}</Label>
-              <p className="text-sm text-muted-foreground">
-                {t('updates.autoCheckDesc')}
-              </p>
+          <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+            <div className="flex items-start gap-3">
+              <FileText className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <div className="space-y-1">
+                <Label>{t('updates.policy.title')}</Label>
+                <p className="text-sm text-muted-foreground">
+                  {t('updates.policy.desc')}
+                </p>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {t('updates.policy.guide')}
+                </p>
+              </div>
             </div>
-            <Switch
-              checked={autoCheckUpdate}
-              onCheckedChange={setAutoCheckUpdate}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>{t('updates.autoDownload')}</Label>
-              <p className="text-sm text-muted-foreground">
-                {t('updates.autoDownloadDesc')}
-              </p>
-            </div>
-            <Switch
-              checked={autoDownloadUpdate}
-              onCheckedChange={(value) => {
-                setAutoDownloadUpdate(value);
-                updateSetAutoDownload(value);
-              }}
-            />
           </div>
         </CardContent>
       </Card>

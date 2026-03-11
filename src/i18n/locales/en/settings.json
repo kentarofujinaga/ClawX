@@ -139,6 +139,7 @@
       "available": "Update available: v{{version}}",
       "downloaded": "Ready to install: v{{version}}",
       "autoInstalling": "Restarting to install update in {{seconds}}s...",
+      "manualReviewOnly": "In-app updates are disabled in this fork. Review upstream changes manually.",
       "failed": "Update check failed",
       "latest": "You have the latest version",
       "check": "Check for updates to get the latest features"
@@ -148,14 +149,21 @@
       "downloading": "Downloading...",
       "download": "Download Update",
       "install": "Install & Restart",
+      "manualReviewOnly": "Manual Review Only",
       "cancelAutoInstall": "Cancel",
       "retry": "Retry",
       "check": "Check for Updates"
     },
+    "policy": {
+      "title": "Manual Review Only",
+      "desc": "This fork does not trust upstream releases automatically. Review diffs, dependency changes, updater behavior, and release artifacts before merging.",
+      "guide": "Review guide: docs/update-review-policy.md"
+    },
     "currentVersion": "Current Version",
     "whatsNew": "What's New:",
     "errorDetails": "Error Details:",
-    "help": "When auto-update is enabled, updates are downloaded and installed automatically."
+    "help": "When auto-update is enabled, updates are downloaded and installed automatically.",
+    "helpManualReview": "In-app auto-update is disabled. Fetch from upstream, review security-sensitive changes, run tests, and merge only after verification."
   },
   "advanced": {
     "title": "Advanced",

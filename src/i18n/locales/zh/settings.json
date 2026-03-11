@@ -139,6 +139,7 @@
       "available": "可用更新：v{{version}}",
       "downloaded": "准备安装：v{{version}}",
       "autoInstalling": "将在 {{seconds}} 秒后重启并安装更新...",
+      "manualReviewOnly": "此 fork 已禁用应用内更新。请手动审查 upstream 变更。",
       "failed": "检查更新失败",
       "latest": "您已拥有最新版本",
       "check": "检查更新以获取最新功能"
@@ -148,14 +149,21 @@
       "downloading": "下载中...",
       "download": "下载更新",
       "install": "安装并重启",
+      "manualReviewOnly": "仅手动审查",
       "cancelAutoInstall": "取消",
       "retry": "重试",
       "check": "检查更新"
     },
+    "policy": {
+      "title": "仅手动审查",
+      "desc": "此 fork 不会自动信任 upstream 发布。合并前请检查差异、依赖变更、updater 行为和发布产物。",
+      "guide": "审查指南：docs/update-review-policy.md"
+    },
     "currentVersion": "当前版本",
     "whatsNew": "更新内容：",
     "errorDetails": "错误详情：",
-    "help": "开启自动更新后，更新将自动下载并安装。"
+    "help": "开启自动更新后，更新将自动下载并安装。",
+    "helpManualReview": "应用内自动更新已禁用。请先从 upstream 拉取、做安全审查并运行测试，再决定是否合并。"
   },
   "advanced": {
     "title": "高级",

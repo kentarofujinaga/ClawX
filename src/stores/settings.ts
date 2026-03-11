@@ -85,7 +85,7 @@ const defaultSettings = {
   proxyBypassRules: '<local>;localhost;127.0.0.1;::1',
   gatewayTransportPreference: 'ws-first' as GatewayTransportPreference,
   updateChannel: 'stable' as UpdateChannel,
-  autoCheckUpdate: true,
+  autoCheckUpdate: false,
   autoDownloadUpdate: false,
   sidebarCollapsed: false,
   devModeUnlocked: false,

@@ -78,7 +78,7 @@ const defaults: AppSettings = {
   
   // Update
   updateChannel: 'stable',
-  autoCheckUpdate: true,
+  autoCheckUpdate: false,
   autoDownloadUpdate: false,
   skippedVersions: [],
   

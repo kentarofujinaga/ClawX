@@ -27,7 +27,8 @@ export type UpdateStatus =
   | 'not-available'
   | 'downloading'
   | 'downloaded'
-  | 'error';
+  | 'error'
+  | 'disabled';
 
 interface UpdateState {
   status: UpdateStatus;
@@ -84,6 +85,11 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
         progress: status.progress || null,
         error: status.error || null,
       });
+
+      if (status.status === 'disabled') {
+        set({ isInitialized: true });
+        return;
+      }
     } catch (error) {
       console.error('Failed to get update status:', error);
     }
@@ -130,6 +136,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   },
 
   checkForUpdates: async () => {
+    if (get().status === 'disabled') return;
     set({ status: 'checking', error: null });
     
     try {
@@ -170,6 +177,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   },
 
   downloadUpdate: async () => {
+    if (get().status === 'disabled') return;
     set({ status: 'downloading', error: null });
     
     try {
@@ -187,6 +195,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   },
 
   installUpdate: () => {
+    if (get().status === 'disabled') return;
     void invokeIpc('update:install');
   },
 
@@ -199,6 +208,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   },
 
   setChannel: async (channel) => {
+    if (get().status === 'disabled') return;
     try {
       await invokeIpc('update:setChannel', channel);
     } catch (error) {
@@ -207,6 +217,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   },
 
   setAutoDownload: async (enable) => {
+    if (get().status === 'disabled') return;
     try {
       await invokeIpc('update:setAutoDownload', enable);
     } catch (error) {

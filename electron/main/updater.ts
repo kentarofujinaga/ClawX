@@ -14,9 +14,11 @@ import { setQuitting } from './app-state';
 
 /** Base CDN URL (without trailing channel path) */
 const OSS_BASE_URL = 'https://oss.intelli-spectrum.com';
+const IN_APP_UPDATES_ENABLED = false;
+const MANUAL_REVIEW_ONLY_MESSAGE = 'In-app updates are disabled in this fork. Review upstream changes manually before merging.';
 
 export interface UpdateStatus {
-  status: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+  status: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error' | 'disabled';
   info?: UpdateInfo;
   progress?: ProgressInfo;
   error?: string;
@@ -43,7 +45,9 @@ function detectChannel(version: string): string {
 
 export class AppUpdater extends EventEmitter {
   private mainWindow: BrowserWindow | null = null;
-  private status: UpdateStatus = { status: 'idle' };
+  private status: UpdateStatus = IN_APP_UPDATES_ENABLED
+    ? { status: 'idle' }
+    : { status: 'disabled', error: MANUAL_REVIEW_ONLY_MESSAGE };
   private autoInstallTimer: NodeJS.Timeout | null = null;
   private autoInstallCountdown = 0;
 
@@ -54,7 +58,12 @@ export class AppUpdater extends EventEmitter {
     super();
     
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.autoInstallOnAppQuit = IN_APP_UPDATES_ENABLED;
+
+    if (!IN_APP_UPDATES_ENABLED) {
+      logger.info(`[Updater] ${MANUAL_REVIEW_ONLY_MESSAGE}`);
+      return;
+    }
     
     autoUpdater.logger = {
       info: (msg: string) => logger.info('[Updater]', msg),
@@ -168,6 +177,11 @@ export class AppUpdater extends EventEmitter {
    * final status so the UI never gets stuck in 'checking'.
    */
   async checkForUpdates(): Promise<UpdateInfo | null> {
+    if (!IN_APP_UPDATES_ENABLED) {
+      this.updateStatus({ status: 'disabled', error: MANUAL_REVIEW_ONLY_MESSAGE });
+      return null;
+    }
+
     try {
       const result = await autoUpdater.checkForUpdates();
 
@@ -199,6 +213,11 @@ export class AppUpdater extends EventEmitter {
    * Download available update
    */
   async downloadUpdate(): Promise<void> {
+    if (!IN_APP_UPDATES_ENABLED) {
+      this.updateStatus({ status: 'disabled', error: MANUAL_REVIEW_ONLY_MESSAGE });
+      return;
+    }
+
     try {
       await autoUpdater.downloadUpdate();
     } catch (error) {
@@ -219,6 +238,12 @@ export class AppUpdater extends EventEmitter {
    * the window cleanly while ShipIt runs independently to replace the app.
    */
   quitAndInstall(): void {
+    if (!IN_APP_UPDATES_ENABLED) {
+      this.updateStatus({ status: 'disabled', error: MANUAL_REVIEW_ONLY_MESSAGE });
+      logger.warn('[Updater] install blocked by manual-review-only policy');
+      return;
+    }
+
     logger.info('[Updater] quitAndInstall called');
     setQuitting();
     autoUpdater.quitAndInstall();
@@ -260,6 +285,7 @@ export class AppUpdater extends EventEmitter {
    * Set update channel (stable, beta, dev)
    */
   setChannel(channel: 'stable' | 'beta' | 'dev'): void {
+    if (!IN_APP_UPDATES_ENABLED) return;
     autoUpdater.channel = channel;
   }
 
@@ -267,6 +293,10 @@ export class AppUpdater extends EventEmitter {
    * Set auto-download preference
    */
   setAutoDownload(enable: boolean): void {
+    if (!IN_APP_UPDATES_ENABLED) {
+      autoUpdater.autoDownload = false;
+      return;
+    }
     autoUpdater.autoDownload = enable;
   }
 
