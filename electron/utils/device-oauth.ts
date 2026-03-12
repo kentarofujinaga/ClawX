@@ -101,6 +101,16 @@ class DeviceOAuthManager extends EventEmitter {
             region,
             openUrl: async (url) => {
                 logger.info(`[DeviceOAuth] MiniMax opening browser: ${url}`);
+                try {
+                    const parsed = new URL(url);
+                    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+                        logger.warn(`[DeviceOAuth] Blocked non-HTTP(S) URL scheme: ${parsed.protocol}`);
+                        return;
+                    }
+                } catch {
+                    logger.warn('[DeviceOAuth] Blocked malformed URL');
+                    return;
+                }
                 // Open the authorization URL in the system browser
                 shell.openExternal(url).catch((err) =>
                     logger.warn(`[DeviceOAuth] Failed to open browser:`, err)
@@ -150,6 +160,16 @@ class DeviceOAuthManager extends EventEmitter {
         const token: QwenOAuthToken = await loginQwenPortalOAuth({
             openUrl: async (url) => {
                 logger.info(`[DeviceOAuth] Qwen opening browser: ${url}`);
+                try {
+                    const parsed = new URL(url);
+                    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+                        logger.warn(`[DeviceOAuth] Blocked non-HTTP(S) URL scheme: ${parsed.protocol}`);
+                        return;
+                    }
+                } catch {
+                    logger.warn('[DeviceOAuth] Blocked malformed URL');
+                    return;
+                }
                 shell.openExternal(url).catch((err) =>
                     logger.warn(`[DeviceOAuth] Failed to open browser:`, err)
                 );

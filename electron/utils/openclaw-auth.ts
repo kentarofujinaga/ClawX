@@ -8,7 +8,7 @@
  * equivalents could stall for 500 ms – 2 s+ per call, causing "Not
  * Responding" hangs.
  */
-import { access, mkdir, readFile, writeFile, readdir } from 'fs/promises';
+import { access, chmod, mkdir, readFile, writeFile, readdir } from 'fs/promises';
 import { constants, Dirent } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -60,6 +60,12 @@ async function readJsonFile<T>(filePath: string): Promise<T | null> {
 async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
   await ensureDir(join(filePath, '..'));
   await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  // Restrict permissions on auth-related files to owner-only (0600)
+  if (filePath.includes('auth-profiles') || filePath.includes('models.json')) {
+    await chmod(filePath, 0o600).catch(() => {
+      // chmod may fail on Windows — non-fatal
+    });
+  }
 }
 
 // ── Types ────────────────────────────────────────────────────────

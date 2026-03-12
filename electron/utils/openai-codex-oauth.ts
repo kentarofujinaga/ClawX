@@ -58,6 +58,16 @@ class OpenAICodexOAuthManager extends EventEmitter {
       const creds = await loginOpenAICodex({
         onAuth: ({ url, instructions }) => {
           logger.info('[OpenAICodexOAuth] Browser auth ready');
+          try {
+            const parsed = new URL(url);
+            if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+              logger.warn(`[OpenAICodexOAuth] Blocked non-HTTP(S) URL scheme: ${parsed.protocol}`);
+              return;
+            }
+          } catch {
+            logger.warn('[OpenAICodexOAuth] Blocked malformed URL');
+            return;
+          }
           shell.openExternal(url).catch((error) => {
             logger.warn('[OpenAICodexOAuth] Failed to open browser automatically:', error);
           });
