@@ -23,6 +23,7 @@ import {
 import { TitleBar } from '@/components/layout/TitleBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -719,23 +720,54 @@ function ProviderContent({
 
   // OAuth Flow State
   const [oauthFlowing, setOauthFlowing] = useState(false);
-  const [oauthData, setOauthData] = useState<{
+  const [oauthDeviceData, setOauthDeviceData] = useState<{
     verificationUri: string;
     userCode: string;
     expiresIn: number;
   } | null>(null);
+  const [oauthBrowserData, setOauthBrowserData] = useState<{
+    authorizationUrl: string;
+    instructions?: string;
+    canPasteRedirect: boolean;
+  } | null>(null);
+  const [oauthManualInput, setOauthManualInput] = useState('');
+  const [oauthProgressMessage, setOauthProgressMessage] = useState<string | null>(null);
+  const [submittingOAuthInput, setSubmittingOAuthInput] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
 
   // Manage OAuth events
   useEffect(() => {
     const handleCode = (data: unknown) => {
-      setOauthData(data as { verificationUri: string; userCode: string; expiresIn: number });
+      setOauthDeviceData(data as { verificationUri: string; userCode: string; expiresIn: number });
+      setOauthBrowserData(null);
+      setOauthProgressMessage(null);
       setOauthError(null);
+    };
+
+    const handleAuth = (data: unknown) => {
+      setOauthBrowserData(data as {
+        authorizationUrl: string;
+        instructions?: string;
+        canPasteRedirect: boolean;
+      });
+      setOauthDeviceData(null);
+      setOauthProgressMessage(null);
+      setOauthError(null);
+    };
+
+    const handleProgress = (data: unknown) => {
+      const message = (data as { message?: string })?.message;
+      if (message) {
+        setOauthProgressMessage(message);
+      }
     };
 
     const handleSuccess = async () => {
       setOauthFlowing(false);
-      setOauthData(null);
+      setOauthDeviceData(null);
+      setOauthBrowserData(null);
+      setOauthManualInput('');
+      setOauthProgressMessage(null);
       setKeyValid(true);
 
       if (selectedProvider) {
@@ -752,10 +784,14 @@ function ProviderContent({
 
     const handleError = (data: unknown) => {
       setOauthError((data as { message: string }).message);
-      setOauthData(null);
+      setOauthDeviceData(null);
+      setOauthBrowserData(null);
+      setOauthProgressMessage(null);
     };
 
     window.electron.ipcRenderer.on('oauth:code', handleCode);
+    window.electron.ipcRenderer.on('oauth:auth', handleAuth);
+    window.electron.ipcRenderer.on('oauth:progress', handleProgress);
     window.electron.ipcRenderer.on('oauth:success', handleSuccess);
     window.electron.ipcRenderer.on('oauth:error', handleError);
 
@@ -764,6 +800,8 @@ function ProviderContent({
       // Easiest is to just let it be, or if they have `off`:
       if (typeof window.electron.ipcRenderer.off === 'function') {
         window.electron.ipcRenderer.off('oauth:code', handleCode);
+        window.electron.ipcRenderer.off('oauth:auth', handleAuth);
+        window.electron.ipcRenderer.off('oauth:progress', handleProgress);
         window.electron.ipcRenderer.off('oauth:success', handleSuccess);
         window.electron.ipcRenderer.off('oauth:error', handleError);
       }
@@ -789,11 +827,17 @@ function ProviderContent({
     }
 
     setOauthFlowing(true);
-    setOauthData(null);
+    setOauthDeviceData(null);
+    setOauthBrowserData(null);
+    setOauthManualInput('');
+    setOauthProgressMessage(null);
     setOauthError(null);
 
     try {
-      await invokeIpc('provider:requestOAuth', selectedProvider);
+      const result = await invokeIpc<{ success: boolean; error?: string }>('provider:requestOAuth', selectedProvider);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to start OAuth');
+      }
     } catch (e) {
       setOauthError(String(e));
       setOauthFlowing(false);
@@ -802,9 +846,36 @@ function ProviderContent({
 
   const handleCancelOAuth = async () => {
     setOauthFlowing(false);
-    setOauthData(null);
+    setOauthDeviceData(null);
+    setOauthBrowserData(null);
+    setOauthManualInput('');
+    setOauthProgressMessage(null);
     setOauthError(null);
     await invokeIpc('provider:cancelOAuth');
+  };
+
+  const handleSubmitOAuthInput = async () => {
+    if (!selectedProvider || !oauthManualInput.trim()) return;
+
+    setSubmittingOAuthInput(true);
+    setOauthError(null);
+
+    try {
+      const result = await invokeIpc<{ success: boolean; error?: string }>(
+        'provider:submitOAuthInput',
+        selectedProvider,
+        oauthManualInput.trim()
+      );
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to submit OAuth redirect');
+      }
+      setOauthProgressMessage(t('settings:aiProviders.oauth.redirectSubmitted'));
+      setOauthManualInput('');
+    } catch (error) {
+      setOauthError(String(error));
+    } finally {
+      setSubmittingOAuthInput(false);
+    }
   };
 
   // On mount, try to restore previously configured provider
@@ -1250,10 +1321,65 @@ function ProviderContent({
                         <p className="font-medium">Authentication Failed</p>
                         <p className="text-sm opacity-80">{oauthError}</p>
                         <Button variant="outline" size="sm" onClick={handleCancelOAuth} className="mt-2">
-                          Try Again
+                          {t('settings:aiProviders.oauth.tryAgain')}
                         </Button>
                       </div>
-                    ) : !oauthData ? (
+                    ) : oauthBrowserData ? (
+                      <div className="space-y-4 w-full text-left">
+                        <div className="space-y-2">
+                          <h3 className="font-medium text-lg text-foreground text-center">{t('settings:aiProviders.oauth.approveLogin')}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {oauthBrowserData.instructions || t('settings:aiProviders.oauth.loginPrompt')}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {t('settings:aiProviders.oauth.callbackHelp')}
+                          </p>
+                        </div>
+
+                        <Button
+                          variant="secondary"
+                          className="w-full"
+                          onClick={() => invokeIpc('shell:openExternal', oauthBrowserData.authorizationUrl)}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          {t('settings:aiProviders.oauth.openLoginPage')}
+                        </Button>
+
+                        {oauthBrowserData.canPasteRedirect && (
+                          <div className="space-y-2">
+                            <Label htmlFor="setup-oauth-redirect-url">{t('settings:aiProviders.oauth.redirectUrlLabel')}</Label>
+                            <Textarea
+                              id="setup-oauth-redirect-url"
+                              value={oauthManualInput}
+                              onChange={(e) => setOauthManualInput(e.target.value)}
+                              placeholder={t('settings:aiProviders.oauth.redirectUrlPlaceholder')}
+                              className="min-h-24"
+                            />
+                            <Button
+                              variant="outline"
+                              className="w-full"
+                              onClick={handleSubmitOAuthInput}
+                              disabled={!oauthManualInput.trim() || submittingOAuthInput}
+                            >
+                              {submittingOAuthInput ? (
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('settings:aiProviders.oauth.waiting')}</>
+                              ) : (
+                                t('settings:aiProviders.oauth.submitRedirect')
+                              )}
+                            </Button>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-2">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>{oauthProgressMessage || t('settings:aiProviders.oauth.waitingApproval')}</span>
+                        </div>
+
+                        <Button variant="ghost" size="sm" className="w-full mt-2" onClick={handleCancelOAuth}>
+                          {t('settings:aiProviders.oauth.cancel')}
+                        </Button>
+                      </div>
+                    ) : !oauthDeviceData ? (
                       <div className="space-y-3 py-4">
                         <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
                         <p className="text-sm text-muted-foreground animate-pulse">Requesting secure login code...</p>
@@ -1271,14 +1397,14 @@ function ProviderContent({
 
                         <div className="flex items-center justify-center gap-2 p-3 bg-background border rounded-lg">
                           <code className="text-2xl font-mono tracking-widest font-bold text-primary">
-                            {oauthData.userCode}
+                            {oauthDeviceData.userCode}
                           </code>
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => {
-                              navigator.clipboard.writeText(oauthData.userCode);
-                              toast.success('Code copied to clipboard');
+                              navigator.clipboard.writeText(oauthDeviceData.userCode);
+                              toast.success(t('settings:aiProviders.oauth.codeCopied'));
                             }}
                           >
                             <Copy className="h-4 w-4" />
@@ -1288,19 +1414,19 @@ function ProviderContent({
                         <Button
                           variant="secondary"
                           className="w-full"
-                          onClick={() => invokeIpc('shell:openExternal', oauthData.verificationUri)}
+                          onClick={() => invokeIpc('shell:openExternal', oauthDeviceData.verificationUri)}
                         >
                           <ExternalLink className="h-4 w-4 mr-2" />
-                          Open Login Page
+                          {t('settings:aiProviders.oauth.openLoginPage')}
                         </Button>
 
                         <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-2">
                           <Loader2 className="h-3 w-3 animate-spin" />
-                          <span>Waiting for approval in browser...</span>
+                          <span>{t('settings:aiProviders.oauth.waitingApproval')}</span>
                         </div>
 
                         <Button variant="ghost" size="sm" className="w-full mt-2" onClick={handleCancelOAuth}>
-                          Cancel
+                          {t('settings:aiProviders.oauth.cancel')}
                         </Button>
                       </div>
                     )}
